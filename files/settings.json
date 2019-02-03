@@ -1,0 +1,13 @@
+{
+    "blocklist-enabled": true,
+    "blocklist-url": "http://list.iblocklist.com/?list=bt_level1&fileformat=p2p&archiveformat=gz",
+    "cache-size-mb": 16,
+    "download-queue-enabled": false,
+    "incomplete-dir-enabled": true,
+    "lpd-enabled": true,
+    "rpc-authentication-required": true,
+    "rpc-whitelist": "0.0.0.0",
+    "rpc-whitelist-enabled": false,
+    "trash-original-torrent-files": true,
+    "watch-dir-enabled": true
+}
