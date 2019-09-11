@@ -12,15 +12,13 @@ ENV TR_AUTH="transmission:transmission"
 # Define a healthcheck
 HEALTHCHECK --timeout=5s CMD transmission-remote --authenv --session-info
 
-# Create directories
-RUN mkdir -pv /etc/transmission-daemon/blocklists \
-    /vol/downloads/.incomplete /vol/watchdir
-
-# Create non-root user
-RUN adduser -DHs /sbin/nologin transmission
+# Create directories; Create running user
+RUN mkdir -pv /vol/config/blocklists \
+    /vol/downloads/.incomplete /vol/watchdir \
+    && adduser -DHs /sbin/nologin transmission
 
 # Add settings file
-COPY files/settings.json /etc/transmission-daemon/settings.json
+COPY ./settings.json /vol/config/settings.json
 
 # Install packages and dependencies
 RUN apt-get update && apt-get install -y \
@@ -32,8 +30,8 @@ RUN apt-get update && apt-get install -y \
 
 # Install initial blocklist
 ARG BLOCKLIST_URL="http://list.iblocklist.com/?list=bt_level1&fileformat=p2p&archiveformat=gz"
-RUN curl -sL ${BLOCKLIST_URL} | gunzip > /etc/transmission-daemon/blocklists/bt_level1 \
-    && chown -R transmission:transmission /etc/transmission-daemon
+RUN curl -sL ${BLOCKLIST_URL} | gunzip > /vol/config/blocklists/bt_level1 \
+    && chown -R transmission:transmission /vol/config/
 
 # Update blocklist hourly using supercronic (a cron alternative built for containers)
 RUN curl -fsSLO "$SUPERCRONIC_URL" \
@@ -48,7 +46,7 @@ RUN curl -fsSLO "$SUPERCRONIC_URL" \
 EXPOSE 9091 51413
 
 # Add docker volumes
-VOLUME /etc/transmission-daemon
+VOLUME /vol
 
 # Install transmission-web-control (https://github.com/ronggang/transmission-web-control)
 ADD https://raw.githubusercontent.com/ronggang/transmission-web-control/master/release/install-tr-control.sh /tmp
@@ -61,8 +59,8 @@ USER transmission
 
 # Run transmission-daemon as default command
 CMD transmission-daemon --foreground --log-info \
-    --config-dir /etc/transmission-daemon \
+    --config-dir /vol/config \
     --download-dir /vol/downloads \
     --incomplete-dir /vol/downloads/.incomplete \
-    --watch-dir /vol/watchdir \
-    --username ${TR_AUTH%:*} --password ${TR_AUTH#*:}
+    -c /vol/watchdir \
+    -t --username ${TR_AUTH%:*} --password ${TR_AUTH#*:}
