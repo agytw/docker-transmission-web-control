@@ -15,8 +15,12 @@ RUN mkdir -pv /vol/config/blocklists \
     && useradd --system --user-group --shell /bin/false transmission
 
 # Install packages and dependencies
+# ca-certificates is needed for curl
+# wget is needed to install TWC
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ca-certificates \
+    wget \
     transmission-cli=${TR_VERSION} \
     transmission-daemon=${TR_VERSION} \
     tzdata \
@@ -36,7 +40,7 @@ RUN curl -sL ${BLOCKLIST_URL} | gunzip > /vol/config/blocklists/bt_level1 \
 # Install transmission-web-control (https://github.com/ronggang/transmission-web-control)
 RUN curl -o /tmp/install-tr-control.sh -L https://raw.githubusercontent.com/ronggang/transmission-web-control/master/release/install-tr-control.sh \
     && chmod +x /tmp/install-tr-control.sh \
-    && echo 1 | sh /tmp/install-tr-control.sh /usr/share/transmission \
+    && echo 1 | bash /tmp/install-tr-control.sh /usr/share/transmission \
     && rm /tmp/install-tr-control.sh
 
 # Expose ports
