@@ -17,9 +17,6 @@ RUN mkdir -pv /vol/config/blocklists \
     /vol/downloads/.incomplete /vol/watchdir \
     && adduser -DHs /sbin/nologin transmission
 
-# Add settings file
-COPY ./settings.json /vol/config/settings.json
-
 # Install packages and dependencies
 RUN apt-get update && apt-get install -y \
     curl \
@@ -27,6 +24,9 @@ RUN apt-get update && apt-get install -y \
     transmission-daemon=${TR_VERSION} \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
+
+# Add settings file
+COPY ./settings.json /vol/config/settings.json
 
 # Install initial blocklist
 ARG BLOCKLIST_URL="http://list.iblocklist.com/?list=bt_level1&fileformat=p2p&archiveformat=gz"
@@ -42,17 +42,17 @@ RUN curl -fsSLO "$SUPERCRONIC_URL" \
     && echo "@hourly transmission-remote --authenv --blocklist-update" > /etc/blocklist-update \
     && supercronic /etc/blocklist-update
 
+# Install transmission-web-control (https://github.com/ronggang/transmission-web-control)
+RUN curl -o /tmp/install-tr-control.sh -L https://raw.githubusercontent.com/ronggang/transmission-web-control/master/release/install-tr-control.sh \
+    && chmod +x /tmp/install-tr-control.sh \
+    && echo 1 | sh /tmp/install-tr-control.sh /usr/share/transmission \
+    && rm /tmp/install-tr-control.sh
+
 # Expose ports
-EXPOSE 9091 51413
+EXPOSE 9091 51413 51413/udp
 
 # Add docker volumes
 VOLUME /vol
-
-# Install transmission-web-control (https://github.com/ronggang/transmission-web-control)
-ADD https://raw.githubusercontent.com/ronggang/transmission-web-control/master/release/install-tr-control.sh /tmp
-RUN chmod +x /tmp/install-tr-control.sh
-RUN echo 1 | sh /tmp/install-tr-control.sh /usr/share/transmission \
-    && rm /tmp/install-tr-control.sh
 
 # Set running user
 USER transmission
