@@ -1,6 +1,7 @@
-# Inspired by https://github.com/PHLAK/docker-transmission
+FROM debian:buster-slim
 
-FROM alpine:3.9
+# Version Pinning
+ENV TR_VERSION="2.94-2"
 
 # Define the authentication user and password
 ENV TR_AUTH="transmission:transmission"
@@ -8,48 +9,53 @@ ENV TR_AUTH="transmission:transmission"
 # Define a healthcheck
 HEALTHCHECK --timeout=5s CMD transmission-remote --authenv --session-info
 
-# Create directories
-RUN mkdir -pv /etc/transmission-daemon/blocklists \
-    /vol/downloads/.incomplete /vol/watchdir
-
-# Create non-root user
-RUN adduser -DHs /sbin/nologin transmission
-
-# Add settings file
-COPY files/settings.json /etc/transmission-daemon/settings.json
+# Create directories; Create running user
+RUN mkdir -pv /vol/config/blocklists \
+    /vol/downloads/.incomplete /vol/watchdir \
+    && useradd --system --user-group --shell /bin/false transmission
 
 # Install packages and dependencies
-RUN apk add --update curl transmission-cli transmission-daemon tzdata \
-    && rm -rf /var/cache/apk/*
+# ca-certificates is needed for curl
+# wget is needed to install TWC
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    wget \
+    transmission-cli=${TR_VERSION} \
+    transmission-daemon=${TR_VERSION} \
+    tzdata \
+    cron\
+    && rm -rf /var/lib/apt/lists/*
 
-# Install initial blocklist
+# Add settings file
+COPY ./settings.json /vol/config/settings.json
+
+# Install initial blocklist; Update blocklist hourly
 ARG BLOCKLIST_URL="http://list.iblocklist.com/?list=bt_level1&fileformat=p2p&archiveformat=gz"
-RUN curl -sL ${BLOCKLIST_URL} | gunzip > /etc/transmission-daemon/blocklists/bt_level1 \
-    && chown -R transmission:transmission /etc/transmission-daemon
-
-# Create bolcklist-update cronjob
-COPY files/blocklist-update /etc/periodic/hourly/blocklist-update
-RUN chmod +x /etc/periodic/hourly/blocklist-update
-
-# Expose ports
-EXPOSE 9091 51413
-
-# Add docker volumes
-VOLUME /etc/transmission-daemon
+RUN curl -sL ${BLOCKLIST_URL} | gunzip > /vol/config/blocklists/bt_level1 \
+    && chown -R transmission:transmission /vol/config/ \
+    && echo -e '#!/usr/bin/env sh \n set -o errexit \n transmission-remote --authenv --blocklist-update > /dev/stdout' > /etc/cron.hourly/blocklist-update \
+    && chmod +x /etc/cron.hourly/blocklist-update
 
 # Install transmission-web-control (https://github.com/ronggang/transmission-web-control)
-ADD https://raw.githubusercontent.com/ronggang/transmission-web-control/master/release/install-tr-control.sh /tmp
-RUN chmod +x /tmp/install-tr-control.sh
-RUN echo 1 | sh /tmp/install-tr-control.sh /usr/share/transmission \
+RUN curl -o /tmp/install-tr-control.sh -L https://raw.githubusercontent.com/ronggang/transmission-web-control/master/release/install-tr-control.sh \
+    && chmod +x /tmp/install-tr-control.sh \
+    && echo 1 | bash /tmp/install-tr-control.sh /usr/share/transmission \
     && rm /tmp/install-tr-control.sh
+
+# Expose ports
+EXPOSE 9091 51413 51413/udp
+
+# Add docker volumes
+VOLUME /vol
 
 # Set running user
 USER transmission
 
 # Run transmission-daemon as default command
 CMD transmission-daemon --foreground --log-info \
-    --config-dir /etc/transmission-daemon \
+    --config-dir /vol/config \
     --download-dir /vol/downloads \
     --incomplete-dir /vol/downloads/.incomplete \
-    --watch-dir /vol/watchdir \
-    --username ${TR_AUTH%:*} --password ${TR_AUTH#*:}
+    -c /vol/watchdir \
+    -t --username ${TR_AUTH%:*} --password ${TR_AUTH#*:}
