@@ -15,7 +15,7 @@ HEALTHCHECK --timeout=5s CMD transmission-remote --authenv --session-info
 # Create directories; Create running user
 RUN mkdir -pv /vol/config/blocklists \
     /vol/downloads/.incomplete /vol/watchdir \
-    && adduser -DHs /sbin/nologin transmission
+    && useradd --system --user-group --shell /bin/false transmission
 
 # Install packages and dependencies
 RUN apt-get update && apt-get install -y \
